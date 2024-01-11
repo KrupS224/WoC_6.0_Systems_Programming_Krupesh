@@ -14,19 +14,20 @@ def organize_files(directory_path):
     # print(files)
 
     for file in files:
-        file_extension = os.path.splitext(
-            file)[1][1:]
-        # print(file_extension)
-        if not file_extension:
-            file_extension = 'Other'
+        if os.path.isfile(os.path.join(directory_path, file)):
+            file_extension = os.path.splitext(
+                file)[1][1:]
+            # print(file_extension)
+            if not file_extension:
+                file_extension = 'Other'
 
-        subdirectory_path = os.path.join(directory_path, file_extension)
-        os.makedirs(subdirectory_path, exist_ok=True)
+            subdirectory_path = os.path.join(directory_path, file_extension)
+            os.makedirs(subdirectory_path, exist_ok=True)
 
-        current_file_path = os.path.join(directory_path, file)
-        new_file_path = os.path.join(subdirectory_path, file)
-        # print(new_file_path)
-        shutil.move(current_file_path, new_file_path)
+            current_file_path = os.path.join(directory_path, file)
+            new_file_path = os.path.join(subdirectory_path, file)
+            # print(new_file_path)
+            shutil.move(current_file_path, new_file_path)
 
     print("File organization successful.")
 
