@@ -1,0 +1,17 @@
+{
+    "test1.css": {
+        "size": 174,
+        "path": "C:\\Semesters\\SEM-06\\WoC 6.0\\checkpoint-2\\Copy\\test1.css",
+        "hash": "fd90516870e0c54a057f3931ff0583b7"
+    },
+    "test2.cpp": {
+        "size": 81,
+        "path": "C:\\Semesters\\SEM-06\\WoC 6.0\\checkpoint-2\\Copy\\test2.cpp",
+        "hash": "234be8c8ed99547dbd5cb80a1b762880"
+    },
+    "test3.js": {
+        "size": 27,
+        "path": "C:\\Semesters\\SEM-06\\WoC 6.0\\checkpoint-2\\Copy\\test3.js",
+        "hash": "6e1116440a426cbbac872a68bc187965"
+    }
+}
