@@ -99,6 +99,9 @@ class VersionControlSystem:
         with open(self.commit_file, 'w') as file:
             json.dump(JSON_data, file, indent=4)
 
+        with open(self.added_file, 'w') as file:
+            json.dump({}, file, indent=4)
+
     def help(self):
         print("Tico - A Version Control System.")
         print("tico init - Initialize a new Tico repository")
