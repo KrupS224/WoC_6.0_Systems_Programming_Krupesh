@@ -45,18 +45,23 @@ class VersionControlSystem:
 
     def status(self):
         all_files = [f for f in os.listdir('.')if os.path.isfile(f)]
-        tracked_files = self.file_handler.get_tracked_files(self.index_file)
-        untracked_files = set(all_files) - set(tracked_files)
+        tracked_files_data = self.file_handler.read_JSON_file(self.added_file)
 
-        if untracked_files:
-            print("Untracked files: ")
-            for file in untracked_files:
-                print(f" {file}")
-        else:
-            print("No untracked files.")
+        untracked_files = {}
+        for file in all_files:
+            hash = self.file_handler.compute_MD5(
+                os.path.join(os.getcwd(), file))
+            if file in tracked_files_data.keys() and tracked_files_data[file] == hash:
+                untracked_files[file] = 'Tracked'
+            else:
+                untracked_files[file] = 'Untracked'
+
+        for file in untracked_files:
+            print(f"{untracked_files[file]}: {file}")
 
     def add(self, filename):
         file_path = os.path.join(os.getcwd(), filename)
+        # file_path = os.path.abspath(filename)
 
         if not os.path.exists(file_path):
             print(f"Error: file {filename} does not exists.")
@@ -81,8 +86,7 @@ class VersionControlSystem:
         added_files = self.file_handler.get_tracked_files(self.added_file)
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        with open(self.commit_file, 'r') as file:
-            JSON_data = json.load(file)
+        JSON_data = self.file_handler.read_JSON_file(self.commit_file)
 
         for filename in added_files:
             commit_data = {
@@ -96,11 +100,19 @@ class VersionControlSystem:
                 commit_data, sort_keys=True).encode()).hexdigest()
             JSON_data[filename] = file_hash
 
-        with open(self.commit_file, 'w') as file:
-            json.dump(JSON_data, file, indent=4)
+        self.file_handler.write_JSON_file(self.commit_file, JSON_data)
+        self.file_handler.write_JSON_file(self.added_file, {})
 
-        with open(self.added_file, 'w') as file:
-            json.dump({}, file, indent=4)
+    def rmcommit(self):
+        latest_commit_filenames = self.file_handler.get_latest_commit_filenames(
+            self.commit_file)
+
+        if not latest_commit_filenames:
+            print("No commits to remove")
+            return
+
+        for filename in latest_commit_filenames:
+            self.add(filename)
 
     def help(self):
         print("Tico - A Version Control System.")
@@ -132,6 +144,7 @@ commands = {
     "status": vcs.status,
     "add": lambda: vcs.add(sys.argv[2]) if len(sys.argv) > 2 else print("File argument missing"),
     "help": vcs.help,
+    "rmcommit": vcs.rmcommit,
     "commit": vcs.commit,
 }
 
