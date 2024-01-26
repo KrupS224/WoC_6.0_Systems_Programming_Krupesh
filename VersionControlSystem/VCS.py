@@ -4,7 +4,8 @@ import sys
 import shutil
 import json
 from datetime import datetime
-from HandleFileClass import HandleFile
+from Classes.HandleFile import HandleFile
+from Classes.Stack import Stack
 
 
 class VersionControlSystem:
@@ -21,6 +22,13 @@ class VersionControlSystem:
 
         # initialize the file handler
         self.file_handler = HandleFile()
+        self.stack = Stack()
+
+    def notInitialized(self, dir_path):
+        files_and_dirs = os.listdir(dir_path)
+        if '.krups' not in files_and_dirs:
+            return True
+        return False
 
     def init(self):
         username = input("Enter your username: ")
@@ -44,38 +52,74 @@ class VersionControlSystem:
         print("New Empty .tico repository created.")
 
     def status(self):
-        all_files = [f for f in os.listdir('.')if os.path.isfile(f)]
-        tracked_files_data = self.file_handler.read_JSON_file(self.added_file)
-
-        untracked_files = {}
-        for file in all_files:
-            hash = self.file_handler.compute_MD5(
-                os.path.join(os.getcwd(), file))
-            if file in tracked_files_data.keys() and tracked_files_data[file] == hash:
-                untracked_files[file] = 'Tracked'
-            else:
-                untracked_files[file] = 'Untracked'
-
-        for file in untracked_files:
-            print(f"{untracked_files[file]}: {file}")
-
-    def add(self, filename):
-        file_path = os.path.join(os.getcwd(), filename)
-        # file_path = os.path.abspath(filename)
-
-        if not os.path.exists(file_path):
-            print(f"Error: file {filename} does not exists.")
+        if self.notInitialized('.'):
+            print("'.krups' folder is not initialized...")
+            print("Run: 'tico init' command to initialize tico repository")
             return
 
-        file_hash_MD5 = self.file_handler.compute_MD5(file_path)
+        tracked_files_data = self.file_handler.read_JSON_file(self.added_file)
+
+        def is_subdirectory(parent, child):
+            relative_path = os.path.relpath(child, parent)
+            return not relative_path.startswith('..') and not os.path.isabs(relative_path)
+
+        for root, dirs, files in os.walk(os.getcwd()):
+            dirs[:] = [d for d in dirs if d not in [
+                '.krups', 'Classes', '__pycache__', '.git']]
+            # print("dirs: ", dirs)
+            for file in files:
+                file_path = os.path.join(root, file)
+                hash = self.file_handler.compute_MD5(file_path)
+                rel_path = os.path.relpath(file_path, os.getcwd())
+
+                if rel_path in tracked_files_data.keys() and tracked_files_data[rel_path] == hash:
+                    status = 'Tracked'
+                else:
+                    status = 'Untracked'
+
+                print(f"{status}: {rel_path}")
+
+    def add(self, file_path_full, file_path_relative=None):
+        if not os.path.exists(file_path_full):
+            print(f"Error: File '{file_path_relative}' does not exist.")
+            return
+
+        file_hash_MD5 = self.file_handler.compute_MD5(file_path_full)
+        file_path_relative = file_path_relative if file_path_relative else os.path.normpath(
+            file_path_full)
         self.file_handler.add_JSON_data(
-            self.added_file, filename, file_hash_MD5)
+            self.added_file, file_path_relative, file_hash_MD5)
         self.file_handler.add_JSON_data(
-            self.index_file, filename, file_hash_MD5)
+            self.index_file, file_path_relative, file_hash_MD5)
+
+    def add_with_subdirs(self, dir_path):
+        if self.notInitialized('.'):
+            print("'.krups' folder is not initialized...")
+            print("Run: 'tico init' command to initialize tico repository")
+            return
+
+        if not os.path.isdir(dir_path):
+            self.add(dir_path)
+            return
+
+        for root, dirs, files in os.walk(dir_path):
+            dirs[:] = [d for d in dirs if d not in [
+                '.krups', 'Classes', '__pycache__', '.git']]
+
+            for file in files:
+                file_path_full = os.path.normpath(os.path.join(root, file))
+                file_path_relative = os.path.normpath(
+                    file_path_full)
+                self.add(file_path_full, file_path_relative)
 
     def commit(self):
         if len(sys.argv) < 4 or sys.argv[2] != '-m':
             print("Usage: python VCS.py commit -m <message>")
+            return
+
+        if self.notInitialized('.'):
+            print("'.krups' folder is not initialized...")
+            print("Run: 'tico init' command to initialize tico repository")
             return
 
         if not self.file_handler.is_change_to_commit(self.added_file):
@@ -104,6 +148,11 @@ class VersionControlSystem:
         self.file_handler.write_JSON_file(self.added_file, {})
 
     def rmcommit(self):
+        if self.notInitialized('.'):
+            print("'.krups' folder is not initialized...")
+            print("Run: 'tico init' command to initialize tico repository")
+            return
+
         latest_commit_filenames = self.file_handler.get_latest_commit_filenames(
             self.commit_file)
 
@@ -131,7 +180,7 @@ class VersionControlSystem:
         print("Created by - Krupesh Parmar")
 
 
-vcs = VersionControlSystem()
+vcs = VersionControlSystem('.krups')
 
 if len(sys.argv) < 2:
     vcs.help()
@@ -142,7 +191,7 @@ command = sys.argv[1]
 commands = {
     "init": vcs.init,
     "status": vcs.status,
-    "add": lambda: vcs.add(sys.argv[2]) if len(sys.argv) > 2 else print("File argument missing"),
+    "add": lambda: vcs.add_with_subdirs(sys.argv[2]) if len(sys.argv) > 2 else print("File argument missing"),
     "help": vcs.help,
     "rmcommit": vcs.rmcommit,
     "commit": vcs.commit,
