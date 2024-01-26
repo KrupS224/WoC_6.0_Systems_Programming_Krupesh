@@ -1,16 +1,6 @@
 {
-    "VCS.py": "c5ca2901f42fd5f898eadf54f4519e45",
-    "temp.txt": "5258bf47639b8f906c1a17aee86c54dd",
+    "temp.txt": "9e3df79d9415ced3002ef27d12b2cd7b",
+    "VCS.py": "eb6df43d35fd0d08e32b8e9a28574c24",
     "temp\\x.py": "d41d8cd98f00b204e9800998ecf8427e",
-    "./VCS.py": "eb862ecbb4eb0e754aaa8bbf70517042",
-    "C:\\Semesters\\SEM-06\\WoC 6.0\\VersionControlSystem\\temp.txt": "5258bf47639b8f906c1a17aee86c54dd",
-    "C:\\Semesters\\SEM-06\\WoC 6.0\\VersionControlSystem\\VCS.py": "eb862ecbb4eb0e754aaa8bbf70517042",
-    "C:\\Semesters\\SEM-06\\WoC 6.0\\VersionControlSystem\\temp\\x.py": "d41d8cd98f00b204e9800998ecf8427e",
-    "C:\\Semesters\\SEM-06\\WoC 6.0\\VersionControlSystem\\temp2\\temp2.txt": "e06a57f4e57366a484fa0b7f6a3c42ff",
-    "null": "e06a57f4e57366a484fa0b7f6a3c42ff",
-    "temp2\\temp2.txt": "e06a57f4e57366a484fa0b7f6a3c42ff",
-    ".\\temp.txt": "5258bf47639b8f906c1a17aee86c54dd",
-    ".\\VCS.py": "fa28960eb4b6464b4dd867d12693bad9",
-    ".\\temp\\x.py": "d41d8cd98f00b204e9800998ecf8427e",
-    ".\\temp2\\temp2.txt": "e06a57f4e57366a484fa0b7f6a3c42ff"
+    "temp2\\temp2.txt": "e06a57f4e57366a484fa0b7f6a3c42ff"
 }
