@@ -1,4 +1,6 @@
+import base64
 import hashlib
+import json
 import os
 import sys
 from datetime import datetime
@@ -10,6 +12,7 @@ class VersionControlSystem:
     def __init__(self, vcs_name=".tico"):
         self.vcs_name = vcs_name
         self.branch = "main"
+        self.username = None
         self.branches_dir = os.path.join(vcs_name, "branches")
         self.objects_dir = os.path.join(vcs_name, "objects")
         self.main_branch = os.path.join(self.branches_dir, "main")
@@ -42,6 +45,7 @@ class VersionControlSystem:
 
     def init(self):
         username = input("Enter your username: ")
+        self.username = username
 
         # Create all directories
         try:
@@ -160,6 +164,7 @@ class VersionControlSystem:
             for root, dirs, files in os.walk(dir_path):
                 dirs[:] = [d for d in dirs if d not in [
                     '.krups', 'Classes', '__pycache__', '.git']]
+                files[:] = [f for f in files if f not in ['VCS.py']]
 
                 for file in files:
                     file_path_full = os.path.normpath(os.path.join(root, file))
@@ -215,19 +220,27 @@ class VersionControlSystem:
                 "branch": self.branch
             }
 
-            commit_data_hash = self.file_handler.compute_MD5_str(commit_data)
+            commit_message_hash = self.file_handler.compute_MD5_str(message)
             head_file = open(os.path.join(
                 self.branches_dir, self.branch, 'HEAD'), 'a')
-            head_file.write(commit_data_hash + '\n')
+            head_file.write(commit_message_hash + '\n')
 
-            self.file_handler.write_JSON_file(os.path.join(
-                self.commits_dir, f"{commit_data_hash}.json"), commit_data)
+            try:
+                commit_data_encoded = base64.b64encode(
+                    json.dumps(commit_data).encode('utf-8'))
+            except Exception as e:
+                print(f"Error encoding commit data: {e}")
+                return
+
+            commit_file_path = os.path.join(
+                self.commits_dir, commit_message_hash)
+            open(commit_file_path, 'wb').write(commit_data_encoded)
 
             for file_path, file_hash in changes.items():
                 file_data_encrypted = self.file_handler.encode_base64_file(os.path.normpath(
                     os.path.join(os.getcwd(), file_path)))
                 open(os.path.join(self.content_dir,
-                                  file_hash + '.txt'), 'w').write(file_data_encrypted)
+                                  file_hash), 'w').write(file_data_encrypted)
 
             self.file_handler.write_JSON_file(self.added_file, {})
         except Exception as e:
@@ -246,14 +259,17 @@ class VersionControlSystem:
             print("No commits done...")
             return
 
-        commit_file = self.file_handler.read_JSON_file(
-            os.path.join(self.commits_dir, f"{last_commit}.json"))
-        committed_files = commit_file['change']
+        commit_file_path = os.path.join(self.commits_dir, last_commit)
+        commit_file_encoded_data = open(commit_file_path, 'rb').read()
+        commit_file_decoded_data = base64.b64decode(
+            commit_file_encoded_data).decode('utf-8')
+        commit_file_decoded_data = json.loads(commit_file_decoded_data)
+        committed_files = commit_file_decoded_data['change']
 
         try:
             for file_path, file_hash in committed_files.items():
                 file_path_encoded_data = os.path.join(
-                    self.content_dir, file_hash+'.txt')
+                    self.content_dir, file_hash)
                 file_path_decoded_data = os.path.normpath(
                     os.path.join(os.getcwd(), file_path))
 
@@ -265,7 +281,7 @@ class VersionControlSystem:
                 os.remove(file_path_encoded_data)
 
             commit_file_path = os.path.join(
-                self.commits_dir, f"{last_commit}.json")
+                self.commits_dir, last_commit)
             os.remove(commit_file_path)
             self.file_handler.remove_last_line(HEAD_path)
         except Exception as e:
