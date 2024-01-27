@@ -90,9 +90,15 @@ class VersionControlSystem:
                 last_commit = self.file_handler.get_last_commit(HEAD_path)
 
                 if last_commit:
-                    commit_file = self.file_handler.read_JSON_file(
-                        os.path.join(self.commits_dir, f"{last_commit}.json"))
-                    committed_files = commit_file['change']
+                    commit_file_path = os.path.join(
+                        self.commits_dir, last_commit)
+                    commit_file_encoded_data = open(
+                        commit_file_path, 'rb').read()
+                    commit_file_decoded_data = base64.b64decode(
+                        commit_file_encoded_data).decode('utf-8')
+                    commit_file_decoded_data = json.loads(
+                        commit_file_decoded_data)
+                    committed_files = commit_file_decoded_data['change']
                     all_commited = True
 
                     for root, dirs, files in os.walk(os.getcwd()):
@@ -326,6 +332,60 @@ class VersionControlSystem:
         except Exception as e:
             print(f"Error adding directory {dir_path}: {e}")
 
+    def push(self, push_dir_full_path):
+        if self.notInitialized('.'):
+            print("'.krups' folder is not initialized...")
+            print("Run: 'tico init' command to initialize tico repository")
+            return
+
+        if os.path.isfile(push_dir_full_path):
+            print("Error: Path is not a directory")
+            return
+
+        if not os.path.exists(push_dir_full_path):
+            os.makedirs(push_dir_full_path)
+
+        HEAD_path = os.path.join(self.branches_dir, self.branch, 'HEAD')
+        last_commit = self.file_handler.get_last_commit(HEAD_path)
+
+        if not last_commit:
+            print("No commits done...")
+            return
+
+        try:
+            commit_file_path = os.path.join(self.commits_dir, last_commit)
+            commit_file_encoded_data = open(commit_file_path, 'rb').read()
+            commit_file_decoded_data = base64.b64decode(
+                commit_file_encoded_data).decode('utf-8')
+            commit_file_decoded_data = json.loads(commit_file_decoded_data)
+            committed_files = commit_file_decoded_data['change']
+        except Exception as e:
+            print(f"Error in opening files: {e}")
+            return
+
+        try:
+            for relative_path, file_hash in committed_files.items():
+                file_path = os.path.join(push_dir_full_path, relative_path)
+
+                dir_name = os.path.dirname(file_path)
+                if not os.path.exists(dir_name):
+                    os.makedirs(dir_name)
+
+                self.file_handler.create_file(file_path)
+
+                file_path_encoded_data = os.path.join(
+                    self.content_dir, file_hash)
+
+                file_data_encoded = open(file_path_encoded_data, 'r').read()
+                file_data_decoded = self.file_handler.decode_base64_file(
+                    file_data_encoded)
+                open(file_path, 'wb').write(file_data_decoded)
+        except Exception as e:
+            print(f"Error in push: {e}")
+            return
+
+        print("Pushed successfully...")
+
     def help(self):
         print("Tico - A Version Control System.")
         print("tico init - Initialize a new Tico repository")
@@ -353,6 +413,10 @@ if len(sys.argv) < 2:
 command = sys.argv[1]
 
 if command == "init":
+    if len(sys.argv) != 2:
+        print("Usage: krups init")
+        sys.exit()
+
     if os.path.exists('.krups'):
         print(f"'.krups' alerady initialized...")
         sys.exit()
@@ -361,7 +425,7 @@ if command == "init":
     sys.exit()
 
 elif command == "status":
-    if len(sys.argv) < 2 or len(sys.argv) > 2:
+    if len(sys.argv) != 2:
         print("Usage: krups status")
         sys.exit()
 
@@ -397,14 +461,22 @@ elif command == "commit":
     sys.exit()
 
 elif command == "rmcommit":
-    if len(sys.argv) < 2 or len(sys.argv) > 2:
-        vcs.help()
+    if len(sys.argv) != 2:
+        print("Usage: krups rmcommit")
         sys.exit()
 
     vcs.rmcommit()
 
+elif command == "push":
+    if len(sys.argv) != 3:
+        print("Usage: krups push <dir_path>")
+        sys.exit()
+
+    vcs.push(sys.argv[2])
+    sys.exit()
+
 elif command == 'help':
-    if len(sys.argv) < 2 or len(sys.argv) > 2:
+    if len(sys.argv) != 2:
         print("Usage: krups help")
         sys.exit()
 
