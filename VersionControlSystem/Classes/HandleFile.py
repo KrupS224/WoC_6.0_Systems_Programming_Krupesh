@@ -39,6 +39,15 @@ class HandleFile:
         except Exception as e:
             print(f"Error adding data to {JSON_file}: {e}")
 
+    def remove_JSON_data(self, JSON_file, file_path_relative):
+        try:
+            file_data = self.read_JSON_file(JSON_file)
+            if file_path_relative in file_data:
+                file_data.pop(file_path_relative)
+                self.write_JSON_file(JSON_file, file_data)
+            else:
+                print(f"{JSON_file}: Key '{
+                      file_path_relative}' not found in {JSON_file}")
         except Exception as e:
             print(f"Error removing data from {JSON_file}: {e}")
 

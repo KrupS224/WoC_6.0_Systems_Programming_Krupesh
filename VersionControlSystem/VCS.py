@@ -271,6 +271,45 @@ class VersionControlSystem:
         except Exception as e:
             print(f"Error in rmcommit: {e}")
 
+    def rmadd(self, file_path_full, file_path_relative=None):
+        try:
+            if not os.path.exists(file_path_full):
+                print(f"Error: File '{file_path_relative}' does not exist.")
+                return
+
+            file_path_relative = file_path_relative if file_path_relative else os.path.normpath(
+                file_path_full)
+            self.file_handler.remove_JSON_data(
+                self.added_file, file_path_relative)
+            self.file_handler.remove_JSON_data(
+                self.index_file, file_path_relative)
+        except Exception as e:
+            print(f"Error removing {file_path_relative}: {str(e)}")
+
+    def rmadd_with_subdirs(self, dir_path):
+        if self.notInitialized('.'):
+            print("'.krups' folder is not initialized...")
+            print("Run: 'tico init' command to initialize tico repository")
+            return
+
+        if not os.path.isdir(dir_path):
+            self.rmadd(dir_path)
+            return
+
+        try:
+            for root, dirs, files in os.walk(dir_path):
+                dirs[:] = [d for d in dirs if d not in [
+                    '.krups', 'Classes', '__pycache__', '.git']]
+                files[:] = [f for f in files if f not in ['VCS.py']]
+
+                for file in files:
+                    file_path_full = os.path.normpath(os.path.join(root, file))
+                    file_path_relative = os.path.normpath(
+                        file_path_full)
+                    self.rmadd(file_path_full, file_path_relative)
+        except Exception as e:
+            print(f"Error adding directory {dir_path}: {e}")
+
     def help(self):
         print("Tico - A Version Control System.")
         print("tico init - Initialize a new Tico repository")
@@ -340,6 +379,13 @@ elif command == "commit":
         print("Usage: krups commit -m <message>")
 
     sys.exit()
+
+elif command == "rmcommit":
+    if len(sys.argv) < 2 or len(sys.argv) > 2:
+        vcs.help()
+        sys.exit()
+
+    vcs.rmcommit()
 
 elif command == 'help':
     if len(sys.argv) < 2 or len(sys.argv) > 2:
