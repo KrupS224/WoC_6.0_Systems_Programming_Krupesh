@@ -59,7 +59,7 @@ class HandleFile:
         except Exception as e:
             print(f"Error appending user details to {users_file}: {e}")
 
-    def get_tracked_files(self, add_file):
+    def get_added_files(self, add_file):
         try:
             file = open(add_file, 'r')
             files_data = json.load(file)
@@ -68,27 +68,22 @@ class HandleFile:
             print(f"Error getting tracked files from {add_file}: {e}")
             return []
 
-    def get_untracked_files(self, added_file):
-        try:
-            tracked_files_data = self.read_JSON_file(added_file)
-        except Exception as e:
-            print(f"Error reading {added_file}: {e}")
-            return []
-
+    def get_untracked_files(self, tracked_files_data):
         untracked_files = []
 
         try:
             for root, dirs, files in os.walk(os.getcwd()):
                 dirs[:] = [d for d in dirs if d not in [
-                    '.krups', 'Classes', '__pycache__', '.git']]
-                files[:] = [f for f in files if f not in ['VCS.py']]
+                    '.krups', '__pycache__', '.git']]
+                files[:] = [f for f in files if f not in [
+                    'VCS.py', 'HandleFile.py', '.gitignore']]
                 # print("dirs: ", dirs)
                 for file in files:
                     file_path = os.path.join(root, file)
                     hash = self.compute_MD5_file(file_path)
                     rel_path = os.path.relpath(file_path, os.getcwd())
 
-                    if not (rel_path in tracked_files_data.keys() and tracked_files_data[rel_path] == hash):
+                    if not (rel_path in tracked_files_data and tracked_files_data[rel_path] == hash):
                         untracked_files.append(rel_path)
         except Exception as e:
             print(f"Error getting untracked files: {e}")
@@ -163,6 +158,22 @@ class HandleFile:
             print(f"Error reading file {head_file_path}: {e}")
             return None
 
+    def get_second_last_commit(self, head_file_path):
+        try:
+            head_content = open(head_file_path).read()
+            head_lines = head_content.split('\n')
+
+            commit_lines = [line.strip()
+                            for line in reversed(head_lines) if line.strip()]
+
+            if len(commit_lines) >= 2:
+                return commit_lines[1]
+            else:
+                return None
+        except Exception as e:
+            print(f"Error reading file {head_file_path}: {e}")
+            return None
+
     def remove_last_line(self, HEAD_path):
         try:
             lines = open(HEAD_path, 'r').readlines()
@@ -171,3 +182,44 @@ class HandleFile:
             open(HEAD_path, 'w').writelines(lines)
         except Exception as e:
             print(f"Error removing last line from file {HEAD_path}: {e}")
+
+    def get_committed_files(self, commits_dir, last_commit, key):
+        commit_file_path = os.path.join(commits_dir, last_commit)
+        commit_file_encoded_data = open(commit_file_path, 'rb').read()
+        commit_file_decoded_data = base64.b64decode(
+            commit_file_encoded_data).decode('utf-8')
+        commit_file_decoded_data = json.loads(commit_file_decoded_data)
+        committed_files = commit_file_decoded_data[key]
+
+        return committed_files
+
+    def get_tracked_files(self, branches_dir, branch, commits_dir):
+        HEAD_path = os.path.join(branches_dir, branch, 'HEAD')
+        last_commit = self.get_last_commit(HEAD_path)
+
+        if not last_commit:
+            return {}, {}
+
+        committed_files = self.get_committed_files(
+            commits_dir, last_commit, 'index')
+        # print(committed_files)
+
+        tracked_files_data = {}
+        for root, dirs, files in os.walk(os.getcwd()):
+            dirs[:] = [d for d in dirs if d not in [
+                '.krups', '__pycache__', '.git']]
+            files[:] = [f for f in files if f not in [
+                        'VCS.py', 'HandleFile.py', '.gitignore']]
+            # print("dirs: ", dirs)
+            for file in files:
+                file_path = os.path.join(root, file)
+                hash = self.compute_MD5_file(file_path)
+                rel_path = os.path.relpath(file_path, os.getcwd())
+
+                if rel_path in committed_files.keys() and committed_files[rel_path] == hash:
+                    tracked_files_data[rel_path] = hash
+
+        all_committed_files = self.get_committed_files(
+            commits_dir, last_commit, 'index')
+
+        return tracked_files_data, all_committed_files
