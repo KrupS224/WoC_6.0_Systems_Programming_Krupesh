@@ -158,6 +158,16 @@ class HandleFile:
             print(f"Error reading file {head_file_path}: {e}")
             return None
 
+    def read_all_lines(self, file_path):
+        try:
+            content = open(file_path).read()
+            lines = [line.strip()
+                     for line in content.split('\n') if line.strip()]
+            return lines
+        except Exception as e:
+            print(f"Error reading file {file_path}: {e}")
+            return []
+
     def get_second_last_commit(self, head_file_path):
         try:
             head_content = open(head_file_path).read()
@@ -209,7 +219,7 @@ class HandleFile:
             dirs[:] = [d for d in dirs if d not in [
                 '.krups', '__pycache__', '.git']]
             files[:] = [f for f in files if f not in [
-                        'VCS.py', 'HandleFile.py', '.gitignore']]
+                'VCS.py', 'HandleFile.py', '.gitignore']]
             # print("dirs: ", dirs)
             for file in files:
                 file_path = os.path.join(root, file)

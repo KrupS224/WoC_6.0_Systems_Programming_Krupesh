@@ -81,8 +81,7 @@ class VersionControlSystem:
                 return
 
             added = self.file_handler.read_JSON_file(
-                self.index_file)
-            # print(added)
+                self.added_file)
 
             tracked_files_data = None
             all_committed_files = None
@@ -93,8 +92,10 @@ class VersionControlSystem:
                 print("Your directory is up to date...")
                 return
 
-            tracked_files_data = tracked_files_data if tracked_files_data else added
-            # print(tracked_files_data)
+            for file_name, file_hash in tracked_files_data.items():
+                tracked_files_data[file_name] = file_hash
+            for file_name, file_hash in added.items():
+                tracked_files_data[file_name] = file_hash
 
             for root, dirs, files in os.walk(os.getcwd()):
                 dirs[:] = [d for d in dirs if d not in [
@@ -128,8 +129,10 @@ class VersionControlSystem:
                 file_path_full)
             self.file_handler.add_JSON_data(
                 self.added_file, file_path_relative, file_path_hash)
+            print("added data in added.json")
             self.file_handler.add_JSON_data(
                 self.index_file, file_path_relative, file_path_hash)
+            print("added data in index.json")
         except Exception as e:
             print(f"Error adding file {file_path_relative}: {str(e)}")
 
@@ -140,7 +143,9 @@ class VersionControlSystem:
             return
 
         if not os.path.isdir(dir_path):
+            print("reached here")
             self.add(dir_path)
+            print("didn't changed func.")
             return
 
         try:
@@ -168,9 +173,14 @@ class VersionControlSystem:
         # print(added)
         tracked_files, all_committed_files = self.file_handler.get_tracked_files(
             self.branches_dir, self.branch, self.commits_dir)
+        tracked_files = {file_name: file_hash for file_name, file_hash in tracked_files.items(
+        )} or {file_name: file_hash for file_name, file_hash in added.items()}
         # print(tracked_files)
 
         untracked_files = self.file_handler.get_untracked_files(tracked_files)
+        untracked_files = [
+            file for file in untracked_files if file not in added.keys()]
+        # print(untracked_files)
 
         if untracked_files:
             print("\nUntracked file(s) present.")
@@ -185,10 +195,8 @@ class VersionControlSystem:
             print("No changes to commit")
             return
 
-        added = self.file_handler.read_JSON_file(self.added_file)
-
         changes = {}
-        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S.%f")[:-3]
+        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S.%f")[:-6]
 
         last_commit = self.file_handler.get_last_commit(os.path.join(
             self.branches_dir, self.branch, 'HEAD'))
@@ -202,6 +210,9 @@ class VersionControlSystem:
                 commit_file_encoded_data).decode('utf-8')
             commit_file_decoded_data = json.loads(commit_file_decoded_data)
             committed_files = commit_file_decoded_data['index']
+        print(committed_files)
+        added = self.file_handler.read_JSON_file(self.added_file)
+        print(added)
 
         for file_path in added:
             if (not committed_files) or (file_path not in committed_files.keys() or committed_files[file_path] != added[file_path]):
@@ -217,7 +228,8 @@ class VersionControlSystem:
             "timestamp": timestamp,
             "added": changes,
             "index": index,
-            "branch": self.branch
+            "branch": self.branch,
+            "author": self.username
         }
 
         commit_data_hash = self.file_handler.compute_MD5_str(
@@ -254,86 +266,107 @@ class VersionControlSystem:
 
         HEAD_path = os.path.join(self.branches_dir, self.branch, 'HEAD')
         last_commit = self.file_handler.get_last_commit(HEAD_path)
-        second_last_commit = self.file_handler.get_second_last_commit(
-            HEAD_path)
 
         if not last_commit:
             print("No commits done...")
             return
 
-        if last_commit and not second_last_commit:
-            try:
-                for root, dirs, files in os.walk(os.getcwd()):
-                    dirs[:] = [d for d in dirs if d not in [
-                        '.krups', '__pycache__', '.git']]
-                    files[:] = [f for f in files if f not in [
-                        'VCS.py', 'HandleFile.py', '.gitignore']]
+        second_last_commit = self.file_handler.get_second_last_commit(
+            HEAD_path)
 
-                    for file in files:
-                        file_path_full = os.path.normpath(
-                            os.path.join(root, file))
-                        os.remove(file_path_full)
+        # remove every file and directory once
+        try:
+            for root, dirs, files in os.walk(os.getcwd()):
+                dirs[:] = [d for d in dirs if d not in [
+                    '.krups', '__pycache__', '.git']]
+                files[:] = [f for f in files if f not in [
+                    'VCS.py', 'HandleFile.py', '.gitignore']]
 
-                for root, dirs, files in os.walk(os.getcwd()):
-                    dirs[:] = [d for d in dirs if d not in [
-                        '.krups', '__pycache__', '.git']]
-                    files[:] = [f for f in files if f not in [
-                        'VCS.py', 'HandleFile.py', '.gitignore']]
+                for file in files:
+                    file_path_full = os.path.normpath(
+                        os.path.join(root, file))
+                    os.remove(file_path_full)
 
-                    for dir in dirs:
-                        dir_path_full = os.path.normpath(
-                            os.path.join(root, dir))
-                        shutil.rmtree(dir_path_full)
+            for root, dirs, files in os.walk(os.getcwd()):
+                dirs[:] = [d for d in dirs if d not in [
+                    '.krups', '__pycache__', '.git']]
+                files[:] = [f for f in files if f not in [
+                    'VCS.py', 'HandleFile.py', '.gitignore']]
 
-                commit_file_path = os.path.join(
-                    self.commits_dir, last_commit)
-                os.remove(commit_file_path)
-                self.file_handler.remove_last_line(HEAD_path)
-
-                self.file_handler.write_JSON_file(self.added_file, {})
-                self.file_handler.write_JSON_file(self.index_file, {})
-            except Exception as e:
-                print(f"Error removing file: {e}")
-
+                for dir in dirs:
+                    dir_path_full = os.path.normpath(
+                        os.path.join(root, dir))
+                    shutil.rmtree(dir_path_full)
+        except Exception as e:
+            print(f"Error removing file(s) or directory: {e}")
             return
 
-        try:
-            committed_files = self.file_handler.get_committed_files(
-                self.commits_dir, second_last_commit, 'added')
-            # print(committed_files)
-
-            for file_path, file_hash in committed_files.items():
-                file_path_encoded_data = os.path.join(
-                    self.content_dir, file_hash)
-                file_path_decoded_data = os.path.normpath(
-                    os.path.join(os.getcwd(), file_path))
-
-                file_data_encoded = open(file_path_encoded_data, 'r').read()
-                file_data_decoded = self.file_handler.decode_base64_file(
-                    file_data_encoded)
-                open(file_path_decoded_data, 'wb').write(file_data_decoded)
-
-                os.remove(file_path_encoded_data)
-
+        # if there was only one commit, remove that commit file too and update added.json and index.json
+        if last_commit and not second_last_commit:
             commit_file_path = os.path.join(
                 self.commits_dir, last_commit)
-            os.remove(commit_file_path)
-            self.file_handler.remove_last_line(HEAD_path)
 
-            # accessing 2nd last line
-            last_commit = self.file_handler.get_last_commit(HEAD_path)
-            # print(last_commit)
-            added = {} if not last_commit else self.file_handler.get_committed_files(
+            committed_files_last_commit = self.file_handler.get_committed_files(
                 self.commits_dir, last_commit, 'added')
-            index = {} if not last_commit else self.file_handler.get_committed_files(
-                self.commits_dir, last_commit, 'index')
-            # print(added, index)
+            for file_path, file_hash in committed_files_last_commit.items():
+                os.remove(os.path.join(self.content_dir, file_hash))
 
-            self.file_handler.write_JSON_file(self.added_file, added)
-            self.file_handler.write_JSON_file(self.index_file, index)
+            self.file_handler.write_JSON_file(self.added_file, {})
+            self.file_handler.write_JSON_file(self.index_file, {})
 
-        except Exception as e:
-            print(f"Error in rmcommit: {e}")
+            self.file_handler.remove_last_line(HEAD_path)
+            os.remove(commit_file_path)
+            return
+
+        # try:
+        # get all the files and directories from 2nd last commit and add them to the current directory
+        committed_files = self.file_handler.get_committed_files(
+            self.commits_dir, second_last_commit, 'index')
+        # print(committed_files)
+
+        for file_path, file_hash in committed_files.items():
+            file_path = os.path.join(os.getcwd(), file_path)
+
+            dir_name = os.path.dirname(file_path)
+            if not os.path.exists(dir_name):
+                os.makedirs(dir_name)
+
+        for file_path, file_hash in committed_files.items():
+            file_path_encoded_data = os.path.join(
+                self.content_dir, file_hash)
+            file_path_decoded_data = os.path.normpath(file_path)
+
+            file_data_encoded = open(file_path_encoded_data, 'r').read()
+            file_data_decoded = self.file_handler.decode_base64_file(
+                file_data_encoded)
+
+            with open(file_path_decoded_data, 'wb') as file:
+                file.write(file_data_decoded)
+
+        committed_files_last_commit = self.file_handler.get_committed_files(
+            self.commits_dir, last_commit, 'added')
+        for file_path, file_hash in committed_files_last_commit.items():
+            os.remove(os.path.join(self.content_dir, file_hash))
+
+        commit_file_path = os.path.join(
+            self.commits_dir, last_commit)
+        os.remove(commit_file_path)
+        self.file_handler.remove_last_line(HEAD_path)
+
+        # accessing 2nd last line
+        last_commit = self.file_handler.get_last_commit(HEAD_path)
+        # print(last_commit)
+        added = {} if not last_commit else self.file_handler.get_committed_files(
+            self.commits_dir, last_commit, 'added')
+        index = {} if not last_commit else self.file_handler.get_committed_files(
+            self.commits_dir, last_commit, 'index')
+        # print(added, index)
+
+        self.file_handler.write_JSON_file(self.added_file, added)
+        self.file_handler.write_JSON_file(self.index_file, index)
+
+        # except Exception as e:
+        #     print(f"Error in rmcommit: {e}")
 
     def rmadd(self, file_path_full, file_path_relative=None):
         try:
@@ -432,6 +465,51 @@ class VersionControlSystem:
 
         print("Pushed successfully...")
 
+    def log(self):
+        if self.notInitialized('.'):
+            print("'.krups' folder is not initialized...")
+            print("Run: 'tico init' command to initialize tico repository")
+            return
+
+        HEAD_path = os.path.join(self.branches_dir, self.branch, 'HEAD')
+        all_commits = self.file_handler.read_all_lines(HEAD_path)
+
+        if not all_commits:
+            print("No logs available...")
+            return
+
+        for commit_file in all_commits:
+            commit_file_path = os.path.join(self.commits_dir, commit_file)
+            commit_file_encoded_data = open(commit_file_path, 'rb').read()
+            commit_file_decoded_data = base64.b64decode(
+                commit_file_encoded_data).decode('utf-8')
+            commit_file_decoded_data = json.loads(commit_file_decoded_data)
+
+            print()
+            print("*"*80)
+            print()
+            print(f"Commit: {commit_file}")
+            print(f"Author: {commit_file_decoded_data['author']}")
+            print(f"Message: {commit_file_decoded_data['message']}")
+            print(f"Timestamp: {commit_file_decoded_data['timestamp']}")
+            print(f"Branch: {commit_file_decoded_data['branch']}")
+            print("-"*60)
+            print("Added / Modified files:")
+            for file_path, file_hash in commit_file_decoded_data['added'].items():
+                print(f"\t{file_path}: {file_hash}")
+            print("-"*60)
+            print("All files:")
+            for file_path, file_hash in commit_file_decoded_data['index'].items():
+                print(f"\t{file_path}: {file_hash}")
+
+        print()
+        print("*"*80)
+        print()
+
+    def user_set(self, newUsername):
+        lines = self.file_handler.read_all_lines(self.users_file)
+        print(lines)
+
     def help(self):
         print("Tico - A Version Control System.")
         print("tico init - Initialize a new Tico repository")
@@ -528,6 +606,24 @@ elif command == "push":
 
     vcs.push(sys.argv[2])
     sys.exit()
+
+elif command == "log":
+    if len(sys.argv) != 2:
+        print("Usage: krups log")
+        sys.exit()
+
+    vcs.log()
+    sys.exit()
+
+elif command == "user":
+    sub_command = sys.argv[2]
+    if sub_command == 'set':
+        if len(sys.argv) != 4:
+            print("Usage: krups user set <username>")
+            sys.exit()
+
+        vcs.user_set(sys.argv[3])
+        sys.exit()
 
 elif command == 'help':
     if len(sys.argv) != 2:
