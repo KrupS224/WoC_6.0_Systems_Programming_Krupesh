@@ -105,8 +105,6 @@ class HandleFile:
         except Exception as e:
             print(f"Error reading file {file_path}: {e}")
             return None
-        finally:
-            file.close()
 
         return md5.hexdigest()
 

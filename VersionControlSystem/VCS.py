@@ -210,9 +210,9 @@ class VersionControlSystem:
                 commit_file_encoded_data).decode('utf-8')
             commit_file_decoded_data = json.loads(commit_file_decoded_data)
             committed_files = commit_file_decoded_data['index']
-        print(committed_files)
+        # print(committed_files)
         added = self.file_handler.read_JSON_file(self.added_file)
-        print(added)
+        # print(added)
 
         for file_path in added:
             if (not committed_files) or (file_path not in committed_files.keys() or committed_files[file_path] != added[file_path]):
@@ -408,8 +408,91 @@ class VersionControlSystem:
         except Exception as e:
             print(f"Error adding directory {dir_path}: {e}")
 
-    def checkout(self, message):
-        pass
+    def checkout(self, hash):
+        HEAD_path = os.path.join(self.branches_dir, self.branch, 'HEAD')
+        all_commits = self.file_handler.read_all_lines(
+            os.path.normpath(HEAD_path))
+
+        if hash not in all_commits:
+            print("Invalid commit hash...")
+            return
+
+        index = all_commits.index(hash)
+        earllier_commits = ""
+
+        for i in range(0, index+1):
+            earllier_commits += all_commits[i] + '\n'
+
+        removing_commits = []
+        for commit in all_commits:
+            if commit not in earllier_commits:
+                removing_commits.append(commit)
+
+        for commit in removing_commits:
+            commit_files = self.file_handler.get_committed_files(
+                self.commits_dir, commit, 'added')
+            for file_name, file_hash in commit_files.items():
+                if os.path.exists(os.path.join(self.content_dir, file_hash)):
+                    os.remove(os.path.join(self.content_dir, file_hash))
+            os.remove(os.path.join(self.commits_dir, commit))
+
+        # remove all the files and directories
+        try:
+            for root, dirs, files in os.walk(os.getcwd()):
+                dirs[:] = [d for d in dirs if d not in [
+                    '.krups', '__pycache__', '.git']]
+                files[:] = [f for f in files if f not in [
+                    'VCS.py', 'HandleFile.py', '.gitignore']]
+
+                for file in files:
+                    file_path_full = os.path.normpath(
+                        os.path.join(root, file))
+                    os.remove(file_path_full)
+
+            for root, dirs, files in os.walk(os.getcwd()):
+                dirs[:] = [d for d in dirs if d not in [
+                    '.krups', '__pycache__', '.git']]
+                files[:] = [f for f in files if f not in [
+                    'VCS.py', 'HandleFile.py', '.gitignore']]
+
+                for dir in dirs:
+                    dir_path_full = os.path.normpath(
+                        os.path.join(root, dir))
+                    shutil.rmtree(dir_path_full)
+        except Exception as e:
+            print(f"Error removing file(s) or directory: {e}")
+            return
+
+        try:
+            with open(HEAD_path, 'w') as file:
+                file.write(earllier_commits)
+                file.close()
+        except Exception as e:
+            print(f"Error writing HEAD_file: {e}")
+
+        last_commit = self.file_handler.get_last_commit(HEAD_path)
+        index_files = self.file_handler.get_committed_files(
+            self.commits_dir, last_commit, 'index')
+
+        # make files and dirs
+        for file_path, file_hash in index_files.items():
+            file_path = os.path.join(os.getcwd(), file_path)
+
+            dir_name = os.path.dirname(file_path)
+            if not os.path.exists(dir_name):
+                os.makedirs(dir_name)
+
+        for file_path, file_hash in index_files.items():
+            file_path_encoded_data = os.path.join(
+                self.content_dir, file_hash)
+            file_path_decoded_data = os.path.normpath(file_path)
+
+            file_data_encoded = open(file_path_encoded_data, 'r').read()
+            file_data_decoded = self.file_handler.decode_base64_file(
+                file_data_encoded)
+
+            with open(file_path_decoded_data, 'wb') as file:
+                file.write(file_data_decoded)
 
     def push(self, push_dir_full_path):
         if self.notInitialized('.'):
@@ -592,11 +675,11 @@ elif command == "rmcommit":
     vcs.rmcommit()
 
 elif command == "checkout":
-    message = " ".join(sys.argv[2:])
+    hash = sys.argv[2]
     if len(sys.argv) < 3:
-        print("Usage: krups checkout <commit>")
+        print("Usage: krups checkout <commit hash>")
         sys.exit()
-    vcs.checkout(message)
+    vcs.checkout(hash)
     sys.exit()
 
 elif command == "push":
