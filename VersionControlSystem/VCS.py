@@ -12,7 +12,6 @@ class VersionControlSystem:
     def __init__(self, vcs_name=".tico"):
         self.vcs_name = vcs_name
         self.branch = "main"
-        self.username = None
         self.branches_dir = os.path.join(vcs_name, "branches")
         self.objects_dir = os.path.join(vcs_name, "objects")
         self.main_branch = os.path.join(self.branches_dir, "main")
@@ -24,6 +23,20 @@ class VersionControlSystem:
 
         # initialize helper classes
         self.file_handler = HandleFile()
+
+        # set username
+        self.username = self.set_username()
+
+    def set_username(self):
+        if self.notInitialized('.'):
+            return None
+
+        get_last_user = self.file_handler.get_last_commit(self.users_file)
+        if not get_last_user:
+            return None
+
+        user = get_last_user.split()[2]
+        return user
 
     def create_branch(self, branch_name):
         try:
@@ -129,10 +142,8 @@ class VersionControlSystem:
                 file_path_full)
             self.file_handler.add_JSON_data(
                 self.added_file, file_path_relative, file_path_hash)
-            print("added data in added.json")
             self.file_handler.add_JSON_data(
                 self.index_file, file_path_relative, file_path_hash)
-            print("added data in index.json")
         except Exception as e:
             print(f"Error adding file {file_path_relative}: {str(e)}")
 
@@ -143,9 +154,7 @@ class VersionControlSystem:
             return
 
         if not os.path.isdir(dir_path):
-            print("reached here")
             self.add(dir_path)
-            print("didn't changed func.")
             return
 
         try:
@@ -591,7 +600,82 @@ class VersionControlSystem:
 
     def user_set(self, newUsername):
         lines = self.file_handler.read_all_lines(self.users_file)
-        print(lines)
+        userIdx = -1
+        for line in lines:
+            words = line.split()
+            if newUsername in words:
+                print("Username already exists...")
+                return
+            if self.username in words:
+                userIdx = lines.index(line)
+                break
+
+        del lines[userIdx]
+
+        f1 = open(self.users_file, 'w')
+        for line in lines:
+            f1.write(line + '\n')
+        f1.close()
+
+        self.file_handler.append_user_details(self.users_file, newUsername)
+        self.username = self.set_username()
+
+    def user_show(self):
+        print(self.username)
+
+    def user_add(self, username):
+        lines = self.file_handler.read_all_lines(self.users_file)
+        # print(lines)
+        for line in lines:
+            words = line.split()
+            if username in words:
+                print("Username already exists...")
+                return
+
+        self.file_handler.append_user_details(self.users_file, username)
+        self.username = username
+
+    def user_remove(self, username):
+        lines = self.file_handler.read_all_lines(self.users_file)
+        present = False
+        for index, line in enumerate(lines):
+            words = line.split()
+            if username in words:
+                del lines[index]
+                present = True
+                break
+
+        if not present:
+            print("Username not found...")
+            return
+
+        f1 = open(self.users_file, 'w')
+        for line in lines:
+            f1.write(line + '\n')
+        f1.close()
+
+        if self.username == username:
+            self.username = self.set_username()
+
+    def user_change(self, username):
+        lines = self.file_handler.read_all_lines(self.users_file)
+        present = False
+        for index, line in enumerate(lines):
+            words = line.split()
+            if username in words:
+                line = line.replace(words[2], username)
+                present = True
+                break
+
+        if not present:
+            print("Username not found...")
+            return
+
+        f1 = open(self.users_file, 'w')
+        for line in lines:
+            f1.write(line + '\n')
+        f1.close()
+        self.username = username
 
     def help(self):
         print("Tico - A Version Control System.")
@@ -606,6 +690,9 @@ class VersionControlSystem:
         print("tico status - to see status")
         print("tico user show - to see present user")
         print("tico user set <username> - to change user")
+        print("tico user add <username> - to add new user")
+        print("tico user remove <username> - to remove user")
+        print("tico user change <username> - to change user")
         print("tico push <path> - to push your file to another folder")
         print("Created by - Krupesh Parmar")
 
@@ -613,109 +700,131 @@ class VersionControlSystem:
 vcs = VersionControlSystem('.krups')
 
 
-if len(sys.argv) < 2:
-    vcs.help()
-    sys.exit(1)
+while True:
+    args = input(
+        "\nEnter command (enter 'exit' to exit the program): ").split()
+    command = args[0]
 
-command = sys.argv[1]
+    if command == "init":
+        if len(args) != 1:
+            print("Usage: init")
+            continue
 
-if command == "init":
-    if len(sys.argv) != 2:
-        print("Usage: krups init")
+        if os.path.exists('.krups'):
+            print(f"'.krups' already initialized...")
+            continue
+
+        vcs.init()
+
+    elif command == "status":
+        if len(args) != 1:
+            print("Usage: status")
+            continue
+
+        vcs.status()
+
+    elif command == "add":
+        if len(args) < 2:
+            print("Usage: add <files>")
+            continue
+
+        for arg in args[1:]:
+            vcs.add_with_subdirs(arg)
+
+    elif command == "rmadd":
+        if len(args) < 2:
+            print("Usage: rmadd <files>")
+            continue
+
+        for arg in args[1:]:
+            vcs.rmadd_with_subdirs(arg)
+
+    elif command == "commit":
+        if len(args) == 1:
+            vcs.commit()
+        elif len(args) == 3 and args[1] == '-m':
+            message = ' '.join(args[2:])
+            vcs.commit(message)
+        else:
+            print("Usage: commit -m <message>")
+
+    elif command == "rmcommit":
+        if len(args) != 1:
+            print("Usage: rmcommit")
+            continue
+
+        vcs.rmcommit()
+
+    elif command == "checkout":
+        if len(args) < 2:
+            print("Usage: checkout <commit hash>")
+            continue
+
+        hash = args[1]
+        vcs.checkout(hash)
+
+    elif command == "push":
+        if len(args) != 2:
+            print("Usage: push <dir_path>")
+            continue
+
+        vcs.push(args[1])
+
+    elif command == "log":
+        if len(args) != 1:
+            print("Usage: log")
+            continue
+
+        vcs.log()
+
+    elif command == "user":
+        if vcs.notInitialized('.'):
+            print("'.krups' folder is not initialized...")
+            print("Run: 'tico init' command to initialize tico repository")
+            continue
+
+        if len(args) < 2:
+            print("Usage: user show")
+            print("Usage: user set <username>")
+            print("Usage: user add <username>")
+            print("Usage: user remove <username>")
+            print("Usage: user change <username>")
+            continue
+
+        sub_command = args[1]
+        if sub_command == 'set':
+            vcs.user_set(args[2])
+        elif sub_command == 'show':
+            vcs.user_show()
+        elif sub_command == 'add':
+            vcs.user_add(args[2])
+        elif sub_command == 'remove':
+            vcs.user_remove(args[2])
+        elif sub_command == 'change':
+            vcs.user_change(args[2])
+        else:
+            print("Usage: user show")
+            print("Usage: user set <username>")
+            print("Usage: user add <username>")
+            print("Usage: user remove <username>")
+            print("Usage: user change <username>")
+            continue
+
+    elif command == 'help':
+        if len(args) != 1:
+            print("Usage: help")
+            continue
+
+        vcs.help()
+
+    elif command == 'exit':
+        if len(args) != 1:
+            print("Usage: exit")
+            continue
+
+        print("Exiting...")
         sys.exit()
 
-    if os.path.exists('.krups'):
-        print(f"'.krups' alerady initialized...")
-        sys.exit()
-
-    vcs.init()
-    sys.exit()
-
-elif command == "status":
-    if len(sys.argv) != 2:
-        print("Usage: krups status")
-        sys.exit()
-
-    vcs.status()
-
-
-elif command == "add":
-    if len(sys.argv) < 3:
-        print("Usage: krups add <files>")
-        sys.exit()
-
-    for arg in sys.argv[2:]:
-        vcs.add_with_subdirs(arg)
-    sys.exit()
-
-elif command == "rmadd":
-    if len(sys.argv) < 3:
-        print("Usage: krups rmadd <files>")
-        sys.exit()
-
-    for arg in sys.argv[2:]:
-        vcs.rmadd_with_subdirs(arg)
-    sys.exit()
-
-elif command == "commit":
-    if len(sys.argv) == 3 and sys.argv[2] == '-m':
-        vcs.commit()
-    elif len(sys.argv) == 4 and sys.argv[2] == '-m':
-        vcs.commit(sys.argv[3])
     else:
-        print("Usage: krups commit -m <message>")
-
-    sys.exit()
-
-elif command == "rmcommit":
-    if len(sys.argv) != 2:
-        print("Usage: krups rmcommit")
-        sys.exit()
-
-    vcs.rmcommit()
-
-elif command == "checkout":
-    hash = sys.argv[2]
-    if len(sys.argv) < 3:
-        print("Usage: krups checkout <commit hash>")
-        sys.exit()
-    vcs.checkout(hash)
-    sys.exit()
-
-elif command == "push":
-    if len(sys.argv) != 3:
-        print("Usage: krups push <dir_path>")
-        sys.exit()
-
-    vcs.push(sys.argv[2])
-    sys.exit()
-
-elif command == "log":
-    if len(sys.argv) != 2:
-        print("Usage: krups log")
-        sys.exit()
-
-    vcs.log()
-    sys.exit()
-
-elif command == "user":
-    sub_command = sys.argv[2]
-    if sub_command == 'set':
-        if len(sys.argv) != 4:
-            print("Usage: krups user set <username>")
-            sys.exit()
-
-        vcs.user_set(sys.argv[3])
-        sys.exit()
-
-elif command == 'help':
-    if len(sys.argv) != 2:
-        print("Usage: krups help")
-        sys.exit()
-
-    vcs.help()
-    sys.exit()
-
-else:
-    print(f"krups: '{command}' is not a krups command. See 'krups help'")
-    sys.exit()
+        print(f"krups: '{command}' is not a valid command. See 'help'")
+        continue
