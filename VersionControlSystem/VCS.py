@@ -508,7 +508,7 @@ class VersionControlSystem:
             return
 
         committed_files = self.file_handler.get_committed_files(
-            self.commits_dir, last_commit, 'added')
+            self.commits_dir, last_commit, 'index')
 
         try:
             for relative_path, file_hash in committed_files.items():
