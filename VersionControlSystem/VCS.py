@@ -206,12 +206,13 @@ class VersionControlSystem:
             return
 
         added = self.file_handler.read_JSON_file(self.added_file)
-        # print(added)
+        print(added)
         tracked_files, all_committed_files = self.file_handler.get_tracked_files(
             self.branches_dir, self.branch, self.commits_dir)
+        print("1st: ", tracked_files)
         tracked_files = {file_name: file_hash for file_name, file_hash in tracked_files.items(
         )} or {file_name: file_hash for file_name, file_hash in added.items()}
-        # print(tracked_files)
+        print("2nd: ", tracked_files)
 
         untracked_files = self.file_handler.get_untracked_files(
             tracked_files)
@@ -223,7 +224,7 @@ class VersionControlSystem:
         untracked_files = self.file_handler.get_untracked_files(tracked_files)
         untracked_files = [
             file for file in untracked_files if file not in added.keys()]
-        # print(untracked_files)
+        print(untracked_files)
 
         if untracked_files:
             print("\nUntracked file(s) present.")
@@ -455,9 +456,50 @@ class VersionControlSystem:
             print("Invalid commit hash...")
             return
 
+        # removing commits after the checkout commit
+        index = all_commits.index(hash)
+
+        try:
+            removing_commits = []
+            for i in range(index+1, len(all_commits)):
+                removing_commits.append(all_commits[i])
+
+            for commit in removing_commits:
+                commit_files = self.file_handler.get_committed_files(
+                    self.commits_dir, commit, 'added')
+                for file_name, file_hash in commit_files.items():
+                    if os.path.exists(os.path.join(self.content_dir, file_hash)):
+                        os.remove(os.path.join(self.content_dir, file_hash))
+
+                # moving commit file
+                try:
+                    commit_file_path = os.path.join(self.commits_dir, commit)
+                    move_commit_file_path = os.path.join(
+                        self.rmcommits_dir, commit)
+                    shutil.move(commit_file_path, move_commit_file_path)
+                except Exception as e:
+                    print(f"Error in moving commit file: {e}")
+        except Exception as e:
+            print(f"Error removing commits: {e}")
+
+        # updating HEAD file
+        try:
+            earlier_commits = ""
+
+            for i in range(0, index+1):
+                earlier_commits += all_commits[i] + '\n'
+
+            with open(HEAD_path, 'w') as head_file:
+                head_file.write(earlier_commits)
+                head_file.close()
+        except Exception as e:
+            print(f"Error updating HEAD file: {e}")
+
         # remove all the files and directories
         self.file_handler.clear_current_dir(os.getcwd())
 
+        added_files = self.file_handler.get_committed_files(
+            self.commits_dir, hash, 'added')
         index_files = self.file_handler.get_committed_files(
             self.commits_dir, hash, 'index')
 
@@ -484,6 +526,11 @@ class VersionControlSystem:
 
                 with open(file_path_decoded_data, 'wb') as file:
                     file.write(file_data_decoded)
+
+            # updating added.json and index.json
+            self.file_handler.write_JSON_file(self.added_file, added_files)
+            self.file_handler.write_JSON_file(self.index_file, index_files)
+
         except Exception as e:
             print(f"Error decoding and writing file: {e}")
 
@@ -541,8 +588,9 @@ class VersionControlSystem:
 
         HEAD_path = os.path.join(self.branches_dir, self.branch, 'HEAD')
         all_commits = self.file_handler.read_all_lines(HEAD_path)
+        removed_commits = os.listdir(self.rmcommits_dir)
 
-        if not all_commits:
+        if not all_commits and not removed_commits:
             print("No logs available...")
             return
 
@@ -575,11 +623,15 @@ class VersionControlSystem:
             print("*"*79)
             print()
 
+        if not all_commits:
+            print("No commit data available......\n")
+            print("*"*79)
+            print()
+
         print()
         print("*"*30, " Removed commits ", "*"*30)
         print()
 
-        removed_commits = os.listdir(self.rmcommits_dir)
         for rmcommit in removed_commits:
             rmcommit_file_path = os.path.join(self.rmcommits_dir, rmcommit)
             rmcommit_file_encoded_data = open(rmcommit_file_path, 'rb').read()
@@ -602,6 +654,11 @@ class VersionControlSystem:
                 print(f"\t{file_path}: {file_hash}")
 
             print()
+            print("*"*79)
+            print()
+
+        if not removed_commits:
+            print("No commits removed......\n")
             print("*"*79)
             print()
 
